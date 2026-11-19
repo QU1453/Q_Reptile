@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI 爬虫自动化获客 · 第二组</title>
+  <link rel="stylesheet" href="/ui/style.css?v={{V}}" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="dot"></span>
+      <h1>AI 爬虫自动化获客</h1>
+      <span class="tag">第二组</span>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-tab="chat">对话</button>
+      <button class="tab" data-tab="collect">采集</button>
+      <button class="tab" data-tab="leads">线索</button>
+      <button class="tab" data-tab="mail">开发信</button>
+      <button class="tab" data-tab="debug">调试</button>
+      <button class="tab" data-tab="config">配置</button>
+    </nav>
+    <div class="status">
+      <span class="badge" id="conn-badge">检测中</span>
+      <span class="badge" id="agent-badge">未开始</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- 对话 -->
+    <section class="pane active" id="pane-chat">
+      <div class="chat-log" id="chat-log">
+        <div class="msg bot">你好，我可以帮你：采集名录、抽取线索、清洗验证、写开发信、汇总批次结果。试试输入「走一遍全流程」。</div>
+      </div>
+      <form class="chat-bar" id="chat-form">
+        <input id="chat-input" type="text" placeholder="例如：帮我抽取 raw/ 里的页面并清洗去重" autocomplete="off" />
+        <button type="submit" id="send-btn">发送</button>
+        <button type="button" class="ghost" id="clear-chat">清空</button>
+      </form>
+      <div class="steps" id="step-bar"><span class="muted">暂无工具调用</span></div>
+    </section>
+
+    <!-- 采集 -->
+    <section class="pane" id="pane-collect">
+      <div class="grid2">
+        <div class="card">
+          <div class="card-head">
+            <h2>源与采集</h2>
+            <button class="ghost" id="refresh-crawl">刷新</button>
+          </div>
+          <div class="metrics">
+            <div class="metric"><span id="crawl-total">0</span><small>日志</small></div>
+            <div class="metric"><span id="crawl-ok">0</span><small>成功</small></div>
+            <div class="metric"><span id="crawl-failed">0</span><small>失败</small></div>
+          </div>
+          <form class="stack" id="gen-form">
+            <label class="field"><span>站点地址</span><input id="base-url" type="text" placeholder="https://example.com" /></label>
+            <label class="field"><span>分页规则</span><input id="list-pattern" type="text" placeholder="/list?page={page}" /></label>
+            <div class="row">
+              <label class="field narrow"><span>起始页</span><input id="gen-start" type="number" min="1" value="1" /></label>
+              <label class="field narrow"><span>结束页</span><input id="gen-end" type="number" min="1" value="3" /></label>
+              <button type="submit">生成 URL</button>
+            </div>
+          </form>
+          <p class="hint">生成 URL 不联网；真正抓取需在对话中确认，并遵守目标站条款。</p>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h2>最近失败</h2>
+            <span class="pill" id="crawl-last">—</span>
+          </div>
+          <ul class="plain" id="crawl-fail"><li class="muted">暂无记录</li></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 线索 -->
+    <section class="pane" id="pane-leads">
+      <div class="card">
+        <div class="card-head">
+          <h2>线索库</h2>
+          <button class="ghost" id="refresh-leads">刷新</button>
+        </div>
+        <div class="metrics">
+          <div class="metric"><span id="leads-raw">0</span><small>原始</small></div>
+          <div class="metric"><span id="leads-clean">0</span><small>清洗后</small></div>
+          <div class="metric"><span id="leads-sent">0</span><small>已发送</small></div>
+        </div>
+        <div class="table-wrap">
+          <table id="leads-table">
+            <thead>
+              <tr><th>公司</th><th>官网</th><th>邮箱</th><th>状态</th></tr>
+            </thead>
+            <tbody><tr><td colspan="4" class="empty">暂无数据</td></tr></tbody>
+          </table>
+        </div>
+        <form class="row" id="upload-form">
+          <input id="upload-file" type="file" accept=".csv,.txt,.md" />
+          <button type="submit">上传</button>
+        </form>
+        <p class="hint" id="upload-hint">支持 csv / txt / md，保存到 data/uploads。</p>
+      </div>
+    </section>
+
+    <!-- 开发信 -->
+    <section class="pane" id="pane-mail">
+      <div class="card">
+        <div class="card-head">
+          <h2>开发信</h2>
+          <button class="ghost" id="draft-btn">生成样例</button>
+        </div>
+        <div class="metrics">
+          <div class="metric"><span id="mail-sent">0</span><small>已发</small></div>
+          <div class="metric"><span id="mail-replied">0</span><small>回复</small></div>
+          <div class="metric"><span id="mail-rate">0%</span><small>回复率</small></div>
+        </div>
+        <pre id="draft-box" class="code">点击「生成样例」，会按当前线索写一封四段式开发信（含退订行）。</pre>
+      </div>
+    </section>
+
+    <!-- 调试 -->
+    <section class="pane" id="pane-debug">
+      <div class="grid2">
+        <div class="card">
+          <div class="card-head">
+            <h2>本次调用</h2>
+            <div class="row">
+              <button class="ghost" id="copy-json">复制 JSON</button>
+              <button class="ghost" id="clear-debug">清空</button>
+            </div>
+          </div>
+          <ul class="kv" id="dbg-kv">
+            <li><span>时间</span><b id="dbg-time">—</b></li>
+            <li><span>耗时</span><b id="dbg-ms">—</b></li>
+            <li><span>智能体</span><b id="dbg-agent">—</b></li>
+            <li><span>会话</span><b id="dbg-session">—</b></li>
+          </ul>
+          <div class="table-wrap">
+            <table id="trace-table">
+              <thead><tr><th>#</th><th>动作</th><th>状态</th><th>参数 / 结果</th></tr></thead>
+              <tbody><tr><td colspan="4" class="empty">还没有调用</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h2>最近遥测</h2>
+            <button class="ghost" id="refresh-tail">刷新</button>
+          </div>
+          <pre class="code tall" id="tail-box">—</pre>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>原始响应</h2>
+          <button class="ghost" id="toggle-raw">展开</button>
+        </div>
+        <pre class="code hidden" id="raw-box">—</pre>
+      </div>
+    </section>
+
+    <!-- 配置 -->
+    <section class="pane" id="pane-config">
+      <div class="grid2">
+        <form class="card" id="env-form">
+          <div class="card-head">
+            <h2>后端配置 .env</h2>
+            <button type="submit">保存</button>
+          </div>
+          <label class="field"><span>LLM 模型</span><input name="LLM_MODEL" type="text" /></label>
+          <label class="field"><span>接口地址</span><input name="LLM_BASE_URL" type="text" /></label>
+          <label class="field"><span>权限模式</span>
+            <select name="AGENT_PERMISSION_MODE">
+              <option value="plan">plan · 写操作需确认</option>
+              <option value="auto">auto · 自动执行</option>
+              <option value="readonly">readonly · 只读</option>
+            </select>
+          </label>
+          <label class="field"><span>网络策略</span>
+            <select name="TOOL_NET_POLICY">
+              <option value="allowlist">allowlist · 仅白名单</option>
+              <option value="block">block · 禁止联网</option>
+            </select>
+          </label>
+          <label class="field"><span>白名单域名（逗号分隔）</span><input name="TOOL_NET_ALLOWLIST" type="text" /></label>
+          <div class="row">
+            <label class="field narrow"><span>工具预算</span><input name="MAX_TOOL_CALLS" type="number" min="1" /></label>
+            <label class="field narrow"><span>每日发信</span><input name="DAILY_MAIL_LIMIT" type="number" min="0" /></label>
+            <label class="field narrow"><span>发信演练</span>
+              <select name="DRY_RUN_MAIL"><option value="true">true</option><option value="false">false</option></select>
+            </label>
+          </div>
+          <p class="hint" id="env-hint">保存后写入项目 .env，重启服务生效；API Key 不在界面读写。</p>
+        </form>
+
+        <div class="card">
+          <h2>界面设置</h2>
+          <label class="field"><span>自动刷新</span>
+            <select id="cfg-refresh">
+              <option value="0">关闭</option>
+              <option value="5000">5 秒</option>
+              <option value="10000">10 秒</option>
+              <option value="30000">30 秒</option>
+            </select>
+          </label>
+          <label class="check"><input type="checkbox" id="cfg-enter" /> 回车发送</label>
+          <label class="check"><input type="checkbox" id="cfg-raw" /> 调试默认展开原始 JSON</label>
+          <div class="row">
+            <label class="field narrow"><span>默认起始页</span><input id="cfg-start" type="number" min="1" /></label>
+            <label class="field narrow"><span>默认结束页</span><input id="cfg-end" type="number" min="1" /></label>
+          </div>
+          <p class="hint">界面设置只保存在本机浏览器，不影响后端。</p>
+          <hr />
+          <h2>会话</h2>
+          <div class="row">
+            <input id="cfg-session" type="text" readonly />
+            <button type="button" class="ghost" id="copy-session">复制</button>
+          </div>
+          <button type="button" class="ghost danger" id="reset-session">重置会话</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/ui/app.js?v={{V}}"></script>
+</body>
+</html>
